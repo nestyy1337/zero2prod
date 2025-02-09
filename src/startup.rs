@@ -1,19 +1,22 @@
+use std::str::FromStr;
+
 use crate::{
     configuration::get_configuration,
     routes::{health_check::health_check, subscriptions::subscribe},
 };
 use axum::{
-    Router,
     body::Body,
     extract::Request,
     routing::{get, post},
+    Router,
 };
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer};
-use tracing::{Level, Subscriber, subscriber::set_global_default};
+use tracing::{subscriber::set_global_default, Level, Subscriber};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
-use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
+use tracing_log::LogTracer;
+use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
 use uuid::Uuid;
 
 pub async fn run(listener: TcpListener, pool: PgPool) -> Result<String, std::io::Error> {
@@ -46,8 +49,7 @@ pub async fn run(listener: TcpListener, pool: PgPool) -> Result<String, std::io:
 
     tracing::info!("Successfully created router");
 
-    let port = listener.local_addr().unwrap().port();
-    let address = format!("http://127.0.0.1:{}", port);
+    let address = configuration.application.get_address();
     tracing::info!("About to start listening on: {}", &address);
 
     axum::serve(listener, app).await?;
@@ -57,7 +59,8 @@ pub async fn run(listener: TcpListener, pool: PgPool) -> Result<String, std::io:
 
 pub fn get_subscriber(name: &str, filter: &str) -> impl Subscriber + Send + Sync {
     let formatting = BunyanFormattingLayer::new(name.into(), std::io::stdout);
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(filter));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| filter.into());
+    println!("{:?}", env_filter);
 
     let subsciber = Registry::default()
         .with(env_filter)

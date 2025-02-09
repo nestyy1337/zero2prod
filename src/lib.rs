@@ -12,7 +12,7 @@ pub mod startup;
 
 lazy_static! {
     static ref SUBSCRIBER: () = {
-        let default_filter = "info";
+        let default_filter = "TRACE";
         let default_subscriber_name = "test";
 
         let subscriber = get_subscriber(default_filter, default_subscriber_name);
