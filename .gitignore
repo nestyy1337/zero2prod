@@ -1,2 +1,2 @@
 /target
-*.yaml
+config/base.yaml
