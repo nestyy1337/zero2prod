@@ -12,6 +12,7 @@ async fn main() {
     let main_listener = tokio::net::TcpListener::bind(configuration.application.get_address())
         .await
         .expect("Failed to bind port 8000");
+    println!("PORT: {}", configuration.database.port);
 
     configuration.database.database_name = "newsletter".to_string();
     let db = PgPool::connect_lazy_with(configuration.database.with_db());

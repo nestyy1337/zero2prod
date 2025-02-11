@@ -79,8 +79,8 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
-    let mut config =
-        Config::builder().add_source(File::new("./config/base.yaml", FileFormat::Yaml));
+    let mut config = Config::builder()
+        .add_source(File::new("./config/base.yaml", FileFormat::Yaml).required(false));
 
     let environment = std::env::var("APP_ENVIRONMENT")
         .unwrap_or_else(|_| "local".into())
