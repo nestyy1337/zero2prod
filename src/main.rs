@@ -14,8 +14,7 @@ async fn main() {
         .expect("Failed to bind port 8000");
 
     configuration.database.database_name = "newsletter".to_string();
-    let db = PgPool::connect_lazy(&configuration.database.connection_string())
-        .expect("Failed to connect to main db");
+    let db = PgPool::connect_lazy_with(configuration.database.with_db());
 
     let _ = run(main_listener, db).await;
 }

@@ -18,5 +18,11 @@ services:
     routes:
       - path: /
 
+databases:
+  - engine: PG
+    name: newsletter
+    num_nodes: 1
+    size: db-s-dev-database
+    version: "15"
 
 

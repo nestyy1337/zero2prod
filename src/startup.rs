@@ -21,10 +21,7 @@ use uuid::Uuid;
 
 pub async fn run(listener: TcpListener, pool: PgPool) -> Result<String, std::io::Error> {
     let configuration = get_configuration().expect("Failed to read configuration.");
-    tracing::info!(
-        "Connected to database with string: {}",
-        &configuration.database.connection_string()
-    );
+    tracing::info!("Connected to database with string");
 
     let app = Router::new()
         .route("/health_check", get(health_check))

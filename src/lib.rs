@@ -29,8 +29,7 @@ pub async fn spawn_app() -> String {
     let mut configuration = get_configuration().expect("Failed to get configuration");
     configuration.database.database_name = Uuid::new_v4().to_string();
     configure_database(&configuration.database).await;
-    let db = PgPool::connect_lazy(&configuration.database.connection_string())
-        .expect("Failed to connect to main db");
+    let db = PgPool::connect_lazy_with(configuration.database.with_db());
 
     let port = test_listener.local_addr().unwrap().port();
     let server = run(test_listener, db);
