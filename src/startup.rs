@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 
 use crate::{
     configuration::get_configuration,
@@ -18,6 +18,20 @@ use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
 use uuid::Uuid;
 
+#[derive(Clone)]
+pub struct AppState {
+    pub pool: PgPool,
+    pub email_client: Arc<reqwest::Client>,
+}
+impl AppState {
+    pub fn new(pool: PgPool) -> Self {
+        Self {
+            pool,
+            email_client: Arc::new(reqwest::Client::new()),
+        }
+    }
+}
+
 pub async fn run(listener: TcpListener, pool: PgPool) -> Result<String, std::io::Error> {
     let configuration = get_configuration().expect("Failed to read configuration.");
     tracing::info!(
@@ -25,10 +39,12 @@ pub async fn run(listener: TcpListener, pool: PgPool) -> Result<String, std::io:
         configuration.database.with_db()
     );
 
+    let AppState = AppState::new(pool);
+
     let app = Router::new()
         .route("/health_check", get(health_check))
         .route("/subscribe", post(subscribe))
-        .with_state(pool)
+        .with_state(AppState)
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<Body>| {

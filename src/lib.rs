@@ -7,6 +7,8 @@ use startup::{get_subscriber, init_subscriber, run};
 use uuid::Uuid;
 
 pub mod configuration;
+pub mod domain;
+pub mod email_client;
 pub mod routes;
 pub mod startup;
 

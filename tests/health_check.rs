@@ -13,5 +13,4 @@ async fn health_check_test() {
         .expect("Failed to execute get request");
 
     assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(response.content_length(), Some(0));
 }

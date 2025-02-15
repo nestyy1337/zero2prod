@@ -95,8 +95,9 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
             config = config.add_source(File::new("./config/production.yaml", FileFormat::Yaml));
         }
     };
+
+    // prod env var override
     config = config.add_source(config::Environment::with_prefix("app").separator("__"));
-    println!("C: {:?}", config);
 
     config.build()?.try_deserialize()
 }
