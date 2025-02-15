@@ -35,4 +35,11 @@ services:
       scope: RUN_TIME
       value: ${newsletter.DATABASE}
 
-
+databases:
+  - name: newsletter
+    engine: PG
+    version: "17"
+    production: true
+    cluster_name: db-postgresql-lon1-80806
+    db_name: newsletter
+    db_user: doadmin
