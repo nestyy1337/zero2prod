@@ -1,6 +1,7 @@
 use configuration::{configure_database, get_configuration};
 use lazy_static::lazy_static;
 use sqlx::PgPool;
+use thiserror::Error;
 use tokio::net::TcpListener;
 
 use startup::{get_subscriber, init_subscriber, run};
@@ -12,6 +13,31 @@ pub mod email_client;
 pub mod routes;
 pub mod startup;
 
+#[derive(Error, Debug)]
+pub enum AppError {
+    #[error("Internal Fatal Erorr")]
+    Fatal(String),
+    #[error("ConfirmError")]
+    Confirm(#[from] reqwest::Error),
+}
+
+pub struct TestApp {
+    pub address: String,
+    pub client: reqwest::Client,
+}
+
+impl TestApp {
+    pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
+        self.client
+            .post(format!("{}/subscribe", self.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+}
+
 lazy_static! {
     static ref SUBSCRIBER: () = {
         let default_filter = "TRACE";
@@ -22,7 +48,7 @@ lazy_static! {
     };
 }
 
-pub async fn spawn_app() -> String {
+pub async fn spawn_app() -> TestApp {
     lazy_static::initialize(&SUBSCRIBER);
     let test_listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -41,5 +67,8 @@ pub async fn spawn_app() -> String {
         "test addr: {}",
         format!("http://127.0.0.1:{}", port.to_string()),
     );
-    format!("http://127.0.0.1:{}", port.to_string())
+    TestApp {
+        address: format!("http://127.0.0.1:{}", port.to_string()),
+        client: reqwest::Client::new(),
+    }
 }

@@ -1,4 +1,5 @@
 use config::{Config, File, FileFormat};
+use dotenv::dotenv;
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
@@ -7,10 +8,31 @@ use sqlx::Executor;
 use sqlx::{Connection, PgConnection, PgPool};
 use tracing_log::log::LevelFilter;
 
+use crate::domain::{ParseError, SubscriberEmail};
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
+    pub emailclient: EmailClientSettings,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct EmailClientSettings {
+    pub base_url: String,
+    sender_email: String,
+    pub postmark: String,
+}
+
+impl EmailClientSettings {
+    pub fn sender(&self) -> Result<SubscriberEmail, ParseError> {
+        SubscriberEmail::parse(&self.sender_email)
+    }
+    pub fn sender_static(&self) -> Result<SubscriberEmail<'static>, ParseError> {
+        let owned = self.sender_email.clone();
+        let static_str: &'static str = Box::leak(Box::new(owned));
+        SubscriberEmail::parse(static_str)
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -79,6 +101,8 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
+    dotenv().ok();
+
     let mut config = Config::builder()
         .add_source(File::new("./config/base.yaml", FileFormat::Yaml).required(false));
 
@@ -95,7 +119,7 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
             config = config.add_source(File::new("./config/production.yaml", FileFormat::Yaml));
         }
     };
-
+    config = config.add_source(config::Environment::with_prefix("LOCAL").separator("_"));
     // prod env var override
     config = config.add_source(config::Environment::with_prefix("app").separator("__"));
 

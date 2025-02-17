@@ -3,51 +3,29 @@ use zero2prod::spawn_app;
 
 #[tokio::test]
 async fn subscribe_return_200_for_valid_form_data() {
-    let app_address = spawn_app().await;
+    let test_app = spawn_app().await;
 
-    let client = reqwest::Client::new();
     let body = "name=luka%tim&email=luka_tim%40gmail.com";
-    let response = client
-        .post(format!("{}/subscribe", &app_address))
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(body)
-        .send()
-        .await
-        .expect("Failed to execute request");
+    let response = test_app.post_subscriptions(body.to_string()).await;
 
     assert_eq!(response.status(), StatusCode::CREATED);
 }
 
 #[tokio::test]
 async fn subscribe_return_409_unique_failed() {
-    let app_address = spawn_app().await;
+    let test_app = spawn_app().await;
 
-    let client = reqwest::Client::new();
     let body = "name=luka%tim&email=luka_tim%40gmail.com";
-    let _response = client
-        .post(format!("{}/subscribe", &app_address))
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(body)
-        .send()
-        .await
-        .expect("Failed to execute request");
 
-    let response = client
-        .post(format!("{}/subscribe", &app_address))
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(body)
-        .send()
-        .await
-        .expect("Failed to execute request");
+    let _response = test_app.post_subscriptions(body.to_string()).await;
+    let response = test_app.post_subscriptions(body.to_string()).await;
 
     assert_eq!(response.status(), StatusCode::CONFLICT);
 }
 
 #[tokio::test]
 async fn subscribe_return_400_when_data_is_missing() {
-    let app_address = spawn_app().await;
-
-    let client = reqwest::Client::new();
+    let test_app = spawn_app().await;
 
     let test_cases = vec![
         ("name=le%20guin", "missing the email"),
@@ -56,13 +34,7 @@ async fn subscribe_return_400_when_data_is_missing() {
     ];
 
     for (invalid_body, error_reason) in test_cases {
-        let response = client
-            .post(format!("{}/subscribe", &app_address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(invalid_body)
-            .send()
-            .await
-            .expect("Failed to execute request");
+        let response = test_app.post_subscriptions(invalid_body.to_string()).await;
 
         assert_eq!(
             response.status(),
@@ -75,9 +47,7 @@ async fn subscribe_return_400_when_data_is_missing() {
 
 #[tokio::test]
 async fn subscribe_returns_400_when_fields_are_present_but_empty() {
-    let app_address = spawn_app().await;
-
-    let client = reqwest::Client::new();
+    let test_app = spawn_app().await;
 
     let test_cases = vec![
         ("name=&email=luka%40gmail.com", "empty_name"),
@@ -86,13 +56,7 @@ async fn subscribe_returns_400_when_fields_are_present_but_empty() {
     ];
 
     for (body, error_reason) in test_cases {
-        let response = client
-            .post(format!("{}/subscribe", &app_address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(body)
-            .send()
-            .await
-            .expect("Failed to execute request");
+        let response = test_app.post_subscriptions(body.to_string()).await;
 
         assert_eq!(
             StatusCode::BAD_REQUEST,
@@ -106,9 +70,7 @@ async fn subscribe_returns_400_when_fields_are_present_but_empty() {
 
 #[tokio::test]
 async fn subscribe_returns_400_when_name_is_long() {
-    let app_address = spawn_app().await;
-
-    let client = reqwest::Client::new();
+    let test_app = spawn_app().await;
 
     let test_cases = vec![
         ("name=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
@@ -120,13 +82,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&email=luka%40g
     ];
 
     for (body, error_reason) in test_cases {
-        let response = client
-            .post(format!("{}/subscribe", &app_address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(body)
-            .send()
-            .await
-            .expect("Failed to execute request");
+        let response = test_app.post_subscriptions(body.to_string()).await;
 
         assert_eq!(
             StatusCode::BAD_REQUEST,

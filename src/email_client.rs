@@ -1,12 +1,51 @@
-use reqwest::Client;
+use aws_config::meta::region::RegionProviderChain;
+use aws_sdk_ses::{
+    self as ses,
+    types::{Body, Content, Destination, Message},
+};
+use aws_types::region::Region;
+use serde::{Deserialize, Serialize};
+use ses::Client;
 use thiserror::Error;
 
 use crate::domain::SubscriberEmail;
 
-pub struct EmailClient<'a> {
-    http_client: Client,
-    base_url: String,
-    sender: SubscriberEmail<'a>,
+#[derive(Debug, Clone)]
+pub struct EmailClient {
+    ses_client: Client,
+    // base_url: String,
+    // sender: SubscriberEmail<'a>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct EmailContents<'a> {
+    #[serde(rename = "From")]
+    sender: String,
+    #[serde(rename = "To")]
+    recipient: SubscriberEmail<'a>,
+    #[serde(rename = "Subject")]
+    subject: &'a str,
+    #[serde(rename = "TextBody")]
+    text_content: &'a str,
+    #[serde(rename = "HtmlBody")]
+    html_content: &'a str,
+}
+
+impl<'a> EmailContents<'a> {
+    pub fn new(
+        recipient: SubscriberEmail<'a>,
+        subject: &'a str,
+        // html_content: &'a str,
+        // text_content: &'a str,
+    ) -> Self {
+        Self {
+            sender: "szymon.gluch@netxp.pl".to_string(),
+            recipient,
+            subject,
+            text_content: "Hello dear Postmark user.",
+            html_content: "<html><body><strong>Hello</strong> dear Postmark user.</body></html>",
+        }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -15,21 +54,41 @@ pub enum EmailClientError {
     GenericError,
 }
 
-impl<'a> EmailClient<'a> {
-    pub fn new(url: String, sender: SubscriberEmail<'a>) -> Self {
-        Self {
-            http_client: Client::new(),
-            base_url: url,
-            sender,
-        }
+impl EmailClient {
+    pub fn new(client: Client) -> Self {
+        Self { ses_client: client }
     }
 
-    pub async fn send_email(
-        recipient: SubscriberEmail<'a>,
+    pub async fn send_email_example<'a>(
+        &self,
+        recipient: &SubscriberEmail<'a>,
         subject: &str,
-        html_content: &str,
-        text_content: &str,
-    ) -> Result<(), EmailClientError> {
-        todo!()
+        html: &str,
+        text: &str,
+    ) -> Result<(), ses::Error> {
+        let resp = self
+            .ses_client
+            .send_email()
+            .source("activeandtoffi@gmail.com")
+            .destination(
+                Destination::builder()
+                    .to_addresses(recipient.as_ref())
+                    .build(),
+            )
+            .message(
+                Message::builder()
+                    .subject(Content::builder().data(subject).build().unwrap())
+                    .body(
+                        Body::builder()
+                            .html(Content::builder().data(html).build().unwrap())
+                            .text(Content::builder().data(text).build().unwrap())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .send()
+            .await?;
+        tracing::info!("Email sent: {:?}", resp);
+        Ok(())
     }
 }

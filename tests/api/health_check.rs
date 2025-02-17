@@ -3,11 +3,11 @@ use zero2prod::spawn_app;
 
 #[tokio::test]
 async fn health_check_test() {
-    let app_address = spawn_app().await;
+    let test_app = spawn_app().await;
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/health_check", &app_address))
+        .get(format!("{}/health_check", &test_app.address))
         .send()
         .await
         .expect("Failed to execute get request");

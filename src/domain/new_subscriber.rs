@@ -8,7 +8,7 @@ use super::{ParseError, SubscriberEmail, SubscriberName};
 #[derive(Debug)]
 pub struct Subscriber<'a> {
     name: SubscriberName,
-    email: SubscriberEmail<'a>,
+    pub email: SubscriberEmail<'a>,
 }
 
 impl<'a> Subscriber<'a> {
@@ -26,21 +26,23 @@ impl<'a> Subscriber<'a> {
     subscriber_email = %self.email,
     subscriber_name = %self.name
 ))]
-    pub async fn try_insert(&self, pool: &PgPool) -> Result<(), sqlx::Error> {
+    pub async fn try_insert(&self, pool: &PgPool) -> Result<Uuid, sqlx::Error> {
         let query_span = tracing::info_span!("Saving new subscriber details in the database");
+        let uid = Uuid::new_v4();
         let _query = sqlx::query!(
             r#"
-    INSERT INTO subscriptions (id, email, name, subscribed_at)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO subscriptions (id, email, name, subscribed_at, status)
+    VALUES ($1, $2, $3, $4, $5)
     "#,
-            Uuid::new_v4(),
+            uid,
             self.email.as_ref(),
             self.name.as_ref(),
-            Utc::now()
+            Utc::now(),
+            "Pending"
         )
         .execute(pool)
         .instrument(query_span)
         .await?;
-        Ok(())
+        Ok(uid)
     }
 }

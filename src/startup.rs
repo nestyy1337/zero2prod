@@ -1,9 +1,10 @@
-use std::{str::FromStr, sync::Arc};
-
 use crate::{
     configuration::get_configuration,
-    routes::{health_check::health_check, subscriptions::subscribe},
+    email_client::EmailClient,
+    routes::{confirm::confirm_subscriber, health_check::health_check, subscriptions::subscribe},
 };
+use aws_config::BehaviorVersion;
+use aws_sdk_ses::Client;
 use axum::{
     body::Body,
     extract::Request,
@@ -21,13 +22,13 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
-    pub email_client: Arc<reqwest::Client>,
+    pub email_client: EmailClient,
 }
 impl AppState {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: PgPool, client: EmailClient) -> Self {
         Self {
             pool,
-            email_client: Arc::new(reqwest::Client::new()),
+            email_client: client,
         }
     }
 }
@@ -39,12 +40,16 @@ pub async fn run(listener: TcpListener, pool: PgPool) -> Result<String, std::io:
         configuration.database.with_db()
     );
 
-    let AppState = AppState::new(pool);
+    let config = aws_config::load_defaults(BehaviorVersion::v2024_03_28()).await;
+    let client = EmailClient::new(Client::new(&config));
+
+    let app_state = AppState::new(pool, client);
 
     let app = Router::new()
         .route("/health_check", get(health_check))
         .route("/subscribe", post(subscribe))
-        .with_state(AppState)
+        .route("/subscribe/confirm", get(confirm_subscriber))
+        .with_state(app_state)
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<Body>| {

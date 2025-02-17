@@ -1,8 +1,9 @@
 use super::ParseError;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use validator::ValidateEmail;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubscriberEmail<'a>(&'a str);
 
 impl<'a> AsRef<str> for SubscriberEmail<'a> {
