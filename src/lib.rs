@@ -10,20 +10,14 @@ use uuid::Uuid;
 pub mod configuration;
 pub mod domain;
 pub mod email_client;
+pub mod idempotency;
 pub mod routes;
 pub mod startup;
-
-#[derive(Error, Debug)]
-pub enum AppError {
-    #[error("Internal Fatal Erorr")]
-    Fatal(String),
-    #[error("ConfirmError")]
-    Confirm(#[from] reqwest::Error),
-}
 
 pub struct TestApp {
     pub address: String,
     pub client: reqwest::Client,
+    pub pool: PgPool,
 }
 
 impl TestApp {
@@ -32,6 +26,16 @@ impl TestApp {
             .post(format!("{}/subscribe", self.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn get_confirm_subscription(&self, token: &str) -> reqwest::Response {
+        let params = [("subscription_token", &token)];
+        self.client
+            .get(format!("{}/subscribe/confirm", self.address))
+            .query(&params)
             .send()
             .await
             .expect("Failed to execute request")
@@ -60,7 +64,7 @@ pub async fn spawn_app() -> TestApp {
     let db = PgPool::connect_lazy_with(configuration.database.with_db());
 
     let port = test_listener.local_addr().unwrap().port();
-    let server = run(test_listener, db);
+    let server = run(test_listener, db.clone());
     tokio::spawn(server);
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     tracing::info!(
@@ -70,5 +74,6 @@ pub async fn spawn_app() -> TestApp {
     TestApp {
         address: format!("http://127.0.0.1:{}", port.to_string()),
         client: reqwest::Client::new(),
+        pool: db,
     }
 }

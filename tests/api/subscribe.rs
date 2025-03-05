@@ -8,11 +8,11 @@ async fn subscribe_return_200_for_valid_form_data() {
     let body = "name=luka%tim&email=luka_tim%40gmail.com";
     let response = test_app.post_subscriptions(body.to_string()).await;
 
-    assert_eq!(response.status(), StatusCode::CREATED);
+    assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]
-async fn subscribe_return_409_unique_failed() {
+async fn subscribe_return_500_unique_failed() {
     let test_app = spawn_app().await;
 
     let body = "name=luka%tim&email=luka_tim%40gmail.com";
@@ -20,7 +20,7 @@ async fn subscribe_return_409_unique_failed() {
     let _response = test_app.post_subscriptions(body.to_string()).await;
     let response = test_app.post_subscriptions(body.to_string()).await;
 
-    assert_eq!(response.status(), StatusCode::CONFLICT);
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 }
 
 #[tokio::test]
@@ -92,4 +92,14 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&email=luka%40g
             error_reason
         );
     }
+}
+
+async fn subscribe_fails_if_there_is_a_fatal_database_error() {
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let _ = sqlx::query!("ALTER TABLE subscription_tokens DROP COLUMN subscription_token;",)
+        .execute(&app.pool)
+        .await;
+    let response = app.post_subscriptions(body.into()).await;
+    assert_eq!(response.status().as_u16(), 500);
 }

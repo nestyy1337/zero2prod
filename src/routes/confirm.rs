@@ -1,13 +1,16 @@
+use anyhow::Context;
 use axum::{
     extract::{Query, State},
-    response::{IntoResponse, Response},
+    response::IntoResponse,
 };
 use hyper::StatusCode;
 use serde::Deserialize;
-use sqlx::PgPool;
+use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::{domain::SubscriberEmail, startup::AppState};
+use crate::startup::AppState;
+
+use super::subscriptions::SubscribeError;
 
 #[derive(Debug, Deserialize)]
 pub struct ConfirmQuery {
@@ -17,30 +20,36 @@ pub struct ConfirmQuery {
 pub async fn confirm_subscriber(
     State(state): State<AppState>,
     Query(params): Query<ConfirmQuery>,
-) -> Response {
-    let id = match get_subscriber_id_from_token(&params.subscription_token, &state.pool).await {
-        Ok(id) => id,
-        Err(e) => return StatusCode::BAD_REQUEST.into_response(),
-    };
+) -> Result<impl IntoResponse, SubscribeError> {
+    let mut tx = state
+        .pool
+        .begin()
+        .await
+        .context("Failed to acquire a Postgres connection from the pool")?;
 
-    match update_to_confirmed(&state.pool, id).await {
-        Ok(_) => StatusCode::OK.into_response(),
-        Err(e) => StatusCode::BAD_REQUEST.into_response(),
-    }
+    let id = get_subscriber_id_from_token(&params.subscription_token, &mut tx)
+        .await
+        .context("Failed to get subscriber id")?;
+
+    let _ = update_to_confirmed(&mut tx, id)
+        .await
+        .context("Failed to update subscriber status")?;
+    tx.commit().await.context("Failed to commit transaction")?;
+    Ok(StatusCode::OK.into_response())
 }
 
 async fn get_subscriber_id_from_token<'a>(
     token: &'a str,
-    pool: &'a PgPool,
+    trans: &mut Transaction<'_, Postgres>,
 ) -> Result<Uuid, sqlx::Error> {
     let subscriber_id = sqlx::query!(
         r#"SELECT subscriber_id FROM subscriptions_tokens WHERE subscription_tokens = $1"#,
         &token
     )
-    .fetch_optional(pool)
+    .fetch_optional(&mut **trans)
     .await
     .map_err(|e| {
-        tracing::info!("Failed trying to get subscriber id: {:?}", e);
+        tracing::error!("Failed trying to get subscriber id: {:?}", e);
         e
     })?;
     match subscriber_id {
@@ -49,13 +58,16 @@ async fn get_subscriber_id_from_token<'a>(
     }
 }
 
-#[tracing::instrument(name = "Mark subscriber as confirmed", skip(subscriber_id, pool))]
-pub async fn update_to_confirmed(pool: &PgPool, subscriber_id: Uuid) -> Result<(), sqlx::Error> {
+#[tracing::instrument(name = "Mark subscriber as confirmed", skip(subscriber_id, trans))]
+pub async fn update_to_confirmed(
+    trans: &mut Transaction<'_, Postgres>,
+    subscriber_id: Uuid,
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"UPDATE subscriptions SET status = 'confirmed' WHERE id = $1"#,
         subscriber_id,
     )
-    .execute(pool)
+    .execute(&mut **trans)
     .await
     .map_err(|e| {
         tracing::error!("Failed to execute query: {:?}", e);

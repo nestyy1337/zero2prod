@@ -21,8 +21,10 @@ impl<'a> fmt::Display for SubscriberEmail<'a> {
 impl<'a> SubscriberEmail<'a> {
     pub fn parse(name: &str) -> Result<SubscriberEmail, ParseError> {
         if name.validate_email() {
+            tracing::info!("Successful email validation  for string `{}`", name);
             Ok(SubscriberEmail(name))
         } else {
+            tracing::error!("Email validation failed for string `{}`", name);
             return Err(ParseError::BadEmail);
         }
     }

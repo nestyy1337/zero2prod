@@ -1,7 +1,10 @@
 use crate::{
     configuration::get_configuration,
     email_client::EmailClient,
-    routes::{confirm::confirm_subscriber, health_check::health_check, subscriptions::subscribe},
+    routes::{
+        confirm::confirm_subscriber, health_check::health_check, newsletters::publish_newsletter,
+        subscriptions::subscribe,
+    },
 };
 use aws_config::BehaviorVersion;
 use aws_sdk_ses::Client;
@@ -49,6 +52,7 @@ pub async fn run(listener: TcpListener, pool: PgPool) -> Result<String, std::io:
         .route("/health_check", get(health_check))
         .route("/subscribe", post(subscribe))
         .route("/subscribe/confirm", get(confirm_subscriber))
+        .route("/publish", post(publish_newsletter))
         .with_state(app_state)
         .layer(
             TraceLayer::new_for_http()

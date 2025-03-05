@@ -14,25 +14,6 @@ use crate::domain::{ParseError, SubscriberEmail};
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
-    pub emailclient: EmailClientSettings,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct EmailClientSettings {
-    pub base_url: String,
-    sender_email: String,
-    pub postmark: String,
-}
-
-impl EmailClientSettings {
-    pub fn sender(&self) -> Result<SubscriberEmail, ParseError> {
-        SubscriberEmail::parse(&self.sender_email)
-    }
-    pub fn sender_static(&self) -> Result<SubscriberEmail<'static>, ParseError> {
-        let owned = self.sender_email.clone();
-        let static_str: &'static str = Box::leak(Box::new(owned));
-        SubscriberEmail::parse(static_str)
-    }
 }
 
 #[derive(Deserialize, Debug, Clone)]

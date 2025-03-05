@@ -1,7 +1,10 @@
+use anyhow::Context;
 use chrono::Utc;
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use tracing::Instrument;
 use uuid::Uuid;
+
+use crate::routes::subscriptions::SubscribeError;
 
 use super::{ParseError, SubscriberEmail, SubscriberName};
 
@@ -21,12 +24,15 @@ impl<'a> Subscriber<'a> {
 
     #[tracing::instrument(
     name = "Inserting a new subscriber",
-    skip(pool),
+    skip(transaction),
     fields(
     subscriber_email = %self.email,
     subscriber_name = %self.name
 ))]
-    pub async fn try_insert(&self, pool: &PgPool) -> Result<Uuid, sqlx::Error> {
+    pub async fn try_insert(
+        &self,
+        transaction: &mut Transaction<'_, Postgres>,
+    ) -> Result<Uuid, sqlx::Error> {
         let query_span = tracing::info_span!("Saving new subscriber details in the database");
         let uid = Uuid::new_v4();
         let _query = sqlx::query!(
@@ -40,9 +46,13 @@ impl<'a> Subscriber<'a> {
             Utc::now(),
             "Pending"
         )
-        .execute(pool)
+        .execute(&mut **transaction)
         .instrument(query_span)
-        .await?;
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to execute query: {:?}", e);
+            e
+        })?;
         Ok(uid)
     }
 }

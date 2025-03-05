@@ -14,7 +14,7 @@ impl fmt::Display for SubscriberName {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct SubscriberName(String);
 
 impl SubscriberName {
@@ -30,9 +30,11 @@ impl SubscriberName {
             || is_empty_or_whitespace
             || contais_forbidden_chars
         {
+            tracing::error!("Name validation failed for string `{}`", name);
             return Err(ParseError::BadName);
         }
 
+        tracing::info!("Successfully parsed name: `{}`", name);
         Ok(SubscriberName(name.to_string()))
     }
 }
